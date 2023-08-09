@@ -123,15 +123,15 @@
 			$writeDB->commit();
 
 			$returnData = array();
-			$returnData['session_id']               = intval($lastSessionID);
-			$returnData['first_name']               = $row["firstName"];
-			$returnData['middle_name']              = $row["middleName"];
-			$returnData['last_name']                = $row["lastName"];
-			$returnData['email_address']            = $row["emailAddress"];
-			$returnData['access_token']             = $accesstoken;
-			$returnData['access_token_expires_in']  = $access_token_expiry_seconds;
-			$returnData['refresh_token']            = $refreshtoken;
-			$returnData['refresh_token_expires_in'] = $refresh_token_expiry_seconds;
+			// $returnData['session_id']               = intval($lastSessionID);
+			// $returnData['first_name']               = $row["firstName"];
+			// $returnData['middle_name']              = $row["middleName"];
+			// $returnData['last_name']                = $row["lastName"];
+			// $returnData['email_address']            = $row["emailAddress"];
+			// $returnData['access_token']             = $accesstoken;
+			// $returnData['access_token_expires_in']  = $access_token_expiry_seconds;
+			// $returnData['refresh_token']            = $refreshtoken;
+			// $returnData['refresh_token_expires_in'] = $refresh_token_expiry_seconds;
 			$returnData['user_id']                  = $returned_id;
 
 			sendResponse(201,true,"Account logged in successfully",$returnData);

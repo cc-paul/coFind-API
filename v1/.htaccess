@@ -13,6 +13,10 @@ RewriteRule ^users$ controller/users.php [L]
 RewriteRule ^users/otp/([^/]+)?$ controller/users.php?command=otp&email=$1 [L]
 RewriteRule ^users/verify/([^/]+)?$ controller/users.php?command=verify&email=$1 [L]
 RewriteRule ^users/gsignin/([^/]+)?$ controller/users.php?command=gsignin&email=$1 [L]
+RewriteRule ^users/profile/([^/]+)?$ controller/users.php?command=profile&user_id=$1 [L]
+
+# Profile
+RewriteRule ^profile$ controller/profile.php [L]
 
 # Authentication
 RewriteRule ^sessions$ controller/sessions.php [L]

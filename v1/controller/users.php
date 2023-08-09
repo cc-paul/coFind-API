@@ -237,9 +237,6 @@
 			sendResponse(400,false,"There are errors in your password",$arrErrors,false);
 		}
 
-		if (count($arrErrors) >= 1) {
-			sendResponse(400,false,"There are errors in your password",$arrErrors,false);
-		}
 
 		$emailAddress = $jsonData->emailAddress;
 		$hashed_password = password_hash($jsonData->password, PASSWORD_DEFAULT);
@@ -268,9 +265,8 @@
 		sendResponse(201,true,"Password has been updated. You can now login with your new credentials");
 
 	} else if ($method == 'GET') {
-		$email = $_GET["email"];
-
 		if ($_GET['command'] === 'otp') {
+			$email = $_GET["email"];
 			$otp = generateOTP();
 			$arrEmailContent = array();
 
@@ -328,6 +324,8 @@
 				sendResponse(500,false,"There was an issue creating sending OTP.Please try again");
 			}
 		} else if ($_GET['command'] === 'verify') {
+			$email = $_GET["email"];
+
 			try {
 				$query = $writeDB->prepare("UPDATE cf_registration SET isAccountVerified = 1 WHERE emailAddress = :emailAddress");
 				$query->bindParam(':emailAddress',$email,PDO::PARAM_STR);
@@ -345,6 +343,8 @@
 				sendResponse(500,false,"There was an issue creating sending OTP.Please try again");
 			}
 		} else if ($_GET['command'] === 'gsignin') {
+			$email = $_GET["email"];
+
 			try {
 				$query = $writeDB->prepare("SELECT * FROM cf_registration WHERE emailAddress = :emailAddress");
 				$query->bindParam(':emailAddress',$email,PDO::PARAM_STR);
@@ -356,7 +356,11 @@
 					while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
 						if ($row["isGoogleSignIn"] == 1) {
 							if ($row["isAccountVerified"] == 1) {
-								sendResponse(200,true,"PROCEED_TO_LOGIN");
+								$returnData = array();
+								$returnData['user_id'] = $row["isAccountVerified"];
+
+
+								sendResponse(200,true,"PROCEED_TO_LOGIN",$returnData);
 							} else {
 								sendResponse(200,true,"PROCEED_TO_REGISTRATION");
 							}
@@ -372,6 +376,31 @@
 				sendResponse(500,false,"There was an error creating account. Please try again");
 			}
 
+		} else if ($_GET['command'] === 'profile') {
+			$user_id = $_GET["user_id"];
+
+			try {
+				$query = $writeDB->prepare("SELECT * FROM cf_registration WHERE id = :id");
+				$query->bindParam(':id',$user_id,PDO::PARAM_INT);
+				$query->execute();
+				$returnData = array();
+
+				while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
+					$returnData["firstName"]    = $row["firstName"];
+					$returnData["middleName"]   = $row["middleName"] == "" ? "-" : $row["middleName"];
+					$returnData["lastName"]     = $row["lastName"];
+					$returnData["emailAddress"] = $row["emailAddress"];
+					$returnData["mobileNumber"] = $row["mobileNumber"];
+					$returnData["address"]      = $row["address"];
+					$returnData["username"]     = $row["username"];
+					$returnData["imageLink"]    = $row["imageLink"] == "" ? "-" : $row["imageLink"];
+				}
+
+				sendResponse(201,true,"Account has been retreived",$returnData);
+			} catch (PDOException $ex) {
+				error_log("Database query error: ".$ex,0);
+				sendResponse(500,false,"There was an error creating account. Please try again");
+			}
 		} else {
 			sendResponse(400,false,"Endpoint not found");
 		}
