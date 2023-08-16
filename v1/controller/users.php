@@ -357,7 +357,7 @@
 						if ($row["isGoogleSignIn"] == 1) {
 							if ($row["isAccountVerified"] == 1) {
 								$returnData = array();
-								$returnData['user_id'] = $row["isAccountVerified"];
+								$returnData['user_id'] = $row["id"];
 
 
 								sendResponse(200,true,"PROCEED_TO_LOGIN",$returnData);
@@ -387,7 +387,7 @@
 
 				while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
 					$returnData["firstName"]    = $row["firstName"];
-					$returnData["middleName"]   = $row["middleName"] == "" ? "-" : $row["middleName"];
+					$returnData["middleName"]   = $row["middleName"];
 					$returnData["lastName"]     = $row["lastName"];
 					$returnData["emailAddress"] = $row["emailAddress"];
 					$returnData["mobileNumber"] = $row["mobileNumber"];

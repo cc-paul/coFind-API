@@ -20,3 +20,7 @@ RewriteRule ^profile$ controller/profile.php [L]
 
 # Authentication
 RewriteRule ^sessions$ controller/sessions.php [L]
+
+# Jobs
+RewriteRule ^jobs$ controller/jobs.php [L]
+RewriteRule ^jobs/job/([^/]+)?$ controller/jobs.php?id=$1 [L]
