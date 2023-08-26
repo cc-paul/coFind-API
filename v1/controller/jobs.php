@@ -187,56 +187,117 @@
 			sendResponse(404,false,"Command not found");
 		}
 	} else if ($method === 'GET') {
-		$id = $_GET["id"];
+		if ($_GET['command'] === 'job') {
+			$id = $_GET["id"];
 
-		try {
-			$query = $writeDB->prepare("
-				SELECT
-					a.*,
-					b.address
-				FROM
-					cf_jobs a
-				INNER JOIN
-					cf_registration b 
-				ON 
-					a.createdBy = b.id 
-				WHERE 
-					a.id = :id 
-				ORDER BY 
-					a.dateCreated DESC;
-			");
-			$query->bindParam(':id',$id,PDO::PARAM_INT);
-			$query->execute();
-			$jobs = array();
+			try {
+				$query = $writeDB->prepare("
+					SELECT
+						a.*,
+						b.address
+					FROM
+						cf_jobs a
+					INNER JOIN
+						cf_registration b 
+					ON 
+						a.createdBy = b.id 
+					WHERE 
+						a.id = :id 
+					ORDER BY 
+						a.dateCreated DESC;
+				");
+				$query->bindParam(':id',$id,PDO::PARAM_INT);
+				$query->execute();
+				$jobs = array();
 
-			while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
-				$temp = array();
-				$temp["id"]  = $row["id"];
-				$temp["jobTitle"]  = $row["jobTitle"];
-				$temp["description"]  = $row["description"];
-				$temp["requirementsList"]  = $row["requirementsList"];
-				$temp["jobType"]  = $row["jobType"];
-				$temp["additionalInfo"]  = $row["additionalInfo"];
-				$temp["salary"]  = $row["salary"];
-				$temp["forDiscussion"]  = $row["forDiscussion"];
-				$temp["imageList"]  = $row["imageList"];
-				$temp["status"]  = $row["status"];
-				$temp["createdBy"]  = $row["createdBy"];
-				$temp["isActive"]  = $row["isActive"];
-				$temp["dateCreated"]  = $row["dateCreated"];
-				$temp["f_dateCreated"]  = "Posted ".formatTimeAgo($row["dateCreated"]);
-				$temp["address"]  =  $row["address"];
-				$jobs[] = $temp;
+				while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
+					$temp = array();
+					$temp["id"]  = $row["id"];
+					$temp["jobTitle"]  = $row["jobTitle"];
+					$temp["description"]  = $row["description"];
+					$temp["requirementsList"]  = $row["requirementsList"];
+					$temp["jobType"]  = $row["jobType"];
+					$temp["additionalInfo"]  = $row["additionalInfo"];
+					$temp["salary"]  = $row["salary"];
+					$temp["forDiscussion"]  = $row["forDiscussion"];
+					$temp["imageList"]  = $row["imageList"];
+					$temp["status"]  = $row["status"];
+					$temp["createdBy"]  = $row["createdBy"];
+					$temp["isActive"]  = $row["isActive"];
+					$temp["dateCreated"]  = $row["dateCreated"];
+					$temp["f_dateCreated"]  = "Posted ".formatTimeAgo($row["dateCreated"]);
+					$temp["address"]  =  $row["address"];
+					$jobs[] = $temp;
+				}
+
+				$returnData = array();
+				$returnData["rows_returned"] = count($jobs);
+				$returnData["jobs"] = $jobs;
+
+				sendResponse(201,true,"Job has been retreived",$returnData);
+			} catch (PDOException $ex) {
+				error_log("Database query error: ".$ex,0);
+				sendResponse(500,false,"There was an error getting jobs. Please try again ");
 			}
+		} else if ($_GET['command'] === 'job-all') { 
+			try {
+				$query = $writeDB->prepare("
+					SELECT 
+						a.id,
+						a.jobTitle,
+						a.description,
+						a.requirementsList,
+						a.jobType,
+						a.additionalInfo,
+						IF(a.forDiscussion = 1,'Salary for Discussion',REPLACE(FORMAT(a.salary,2),'.00','')) AS salary,
+						a.imageList,
+						a.`status`,
+						a.dateCreated,
+						b.id AS createdBy,
+						proper(CONCAT(b.lastName,', ',b.firstName,' ',IFNULL(b.middleName,''))) AS fullName,
+						IFNULL(b.imageLink,'-') AS imageLink
+					FROM
+						cf_jobs a 
+					INNER JOIN
+						cf_registration b 
+					ON 
+						a.createdBy = b.id 
+					WHERE
+						a.isActive = 1
+					ORDER BY
+						a.dateCreated DESC;
+				");
+				$query->execute();
+				$jobs = array();
 
-			$returnData = array();
-			$returnData["rows_returned"] = count($jobs);
-			$returnData["jobs"] = $jobs;
+				while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
+					$temp = array();
+					$temp["id"]  = $row["id"];
+					$temp["jobTitle"]  = $row["jobTitle"];
+					$temp["description"]  = $row["description"];
+					$temp["requirementsList"]  = $row["requirementsList"];
+					$temp["jobType"]  = $row["jobType"];
+					$temp["additionalInfo"]  = $row["additionalInfo"];
+					$temp["salary"]  = $row["salary"];
+					$temp["imageList"]  = $row["imageList"];
+					$temp["status"]  = $row["status"];
+					$temp["dateCreated"]  = $row["dateCreated"];
+					$temp["f_dateCreated"]  = "Posted ".formatTimeAgo($row["dateCreated"]);
+					$temp["createdBy"]  =  $row["createdBy"];
+					$temp["fullName"]  =  $row["fullName"];
+					$temp["imageLink"] = $row["imageLink"];
+					$jobs[] = $temp;
+				}
 
-			sendResponse(201,true,"Job has been retreived",$returnData);
-		} catch (PDOException $ex) {
-			error_log("Database query error: ".$ex,0);
-			sendResponse(500,false,"There was an error getting jobs. Please try again ");
+				$returnData = array();
+				$returnData["rows_returned"] = count($jobs);
+				$returnData["jobs"] = $jobs;
+
+				sendResponse(201,true,"Job has been retreived",$returnData);
+			} catch (PDOException $ex) {
+				error_log("Database query error: ".$ex,0);
+				sendResponse(500,false,"There was an error getting jobs. Please try again ");
+			}
 		}
 	} else {
 		sendResponse(404,false,"Endpoint not found");
