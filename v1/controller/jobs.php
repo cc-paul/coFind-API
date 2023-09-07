@@ -183,6 +183,34 @@
 				error_log("Database query error: ".$ex,0);
 				sendResponse(500,false,"There was an error getting jobs. Please try again ");
 			}
+		} else if ($command === "APPLY_JOB") {
+			if (!isset($jsonData->id) || !isset($jsonData->applicantId)) {
+				sendResponse(400,false,"The JSON body you sent has incomplete parameters");
+			}
+
+
+			try {
+				$query = $writeDB->prepare("
+					INSERT INTO cf_applied_job 
+						(jobID,applicantID) 
+					VALUES 
+						(:jobID,:applicantID) 
+				");
+				$query->bindParam(':jobID',$jsonData->id,PDO::PARAM_INT);
+				$query->bindParam(':applicantID',$jsonData->applicantId,PDO::PARAM_INT);
+				$query->execute();
+
+				$rowCount = $query->rowCount();
+
+				if ($rowCount === 0) {
+					sendResponse(500,false,"There was an issue applying job.Please try again");
+				}
+
+				sendResponse(201,true,"Job has been applied. You can chat the recruiter anytime or wait for his/her feedback");
+			} catch (PDOException $ex) {
+				error_log("Database query error: ".$ex,0);
+				sendResponse(500,false,"There was an error applying jobs. Please try again ");
+			}
 		} else {
 			sendResponse(404,false,"Command not found");
 		}
@@ -203,6 +231,8 @@
 						a.createdBy = b.id 
 					WHERE 
 						a.id = :id 
+					AND 
+						a.isActive = 1
 					ORDER BY 
 						a.dateCreated DESC;
 				");
@@ -240,6 +270,8 @@
 				sendResponse(500,false,"There was an error getting jobs. Please try again ");
 			}
 		} else if ($_GET['command'] === 'job-all') { 
+			$id = $_GET["id"];
+
 			try {
 				$query = $writeDB->prepare("
 					SELECT 
@@ -255,13 +287,18 @@
 						a.dateCreated,
 						b.id AS createdBy,
 						proper(CONCAT(b.lastName,', ',b.firstName,' ',IFNULL(b.middleName,''))) AS fullName,
-						IFNULL(b.imageLink,'-') AS imageLink
+						IFNULL(b.imageLink,'-') AS imageLink,
+						IF(IFNULL(c.applicantId,0) = ".$id.",0,1) AS enableApplyButton
 					FROM
 						cf_jobs a 
 					INNER JOIN
 						cf_registration b 
 					ON 
 						a.createdBy = b.id 
+					LEFT JOIN
+						cf_applied_job c 
+					ON 
+						a.id = c.jobId
 					WHERE
 						a.isActive = 1
 					ORDER BY
@@ -286,6 +323,7 @@
 					$temp["createdBy"]  =  $row["createdBy"];
 					$temp["fullName"]  =  $row["fullName"];
 					$temp["imageLink"] = $row["imageLink"];
+					$temp["enableApplyButton"] = $row["enableApplyButton"];
 					$jobs[] = $temp;
 				}
 
@@ -298,7 +336,33 @@
 				error_log("Database query error: ".$ex,0);
 				sendResponse(500,false,"There was an error getting jobs. Please try again ");
 			}
+		} else if ($_GET['command'] === 'delete_job') { 
+			$id = $_GET["id"];
+
+			try {
+				$query = $writeDB->prepare("
+					UPDATE cf_jobs SET 
+						isActive = 0
+					WHERE
+						id = :id
+				");
+				$query->bindParam(':id',$id,PDO::PARAM_INT);
+				$query->execute();
+
+				$rowCount = $query->rowCount();
+
+				if ($rowCount === 0) {
+					sendResponse(500,false,"There was an issue deleting your job.Please try again");
+				}
+
+				sendResponse(201,true,"Job has been deleted");
+			} catch (PDOException $ex) {
+				error_log("Database query error: ".$ex,0);
+				sendResponse(500,false,"There was an error deleting jobs. Please try again ");
+			}
 		}
+	} else if ($method === 'DELETE') {
+		
 	} else {
 		sendResponse(404,false,"Endpoint not found");
 	}

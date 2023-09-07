@@ -24,4 +24,11 @@ RewriteRule ^sessions$ controller/sessions.php [L]
 # Jobs
 RewriteRule ^jobs$ controller/jobs.php [L]
 RewriteRule ^jobs/job/([^/]+)?$ controller/jobs.php?command=job&id=$1 [L]
-RewriteRule ^jobs/job-all controller/jobs.php?command=job-all [L]
+RewriteRule ^jobs/job/delete/([^/]+)?$ controller/jobs.php?command=delete_job&id=$1 [L]
+RewriteRule ^jobs/job-all/([^/]+)?$ controller/jobs.php?command=job-all&id=$1 [L]
+
+
+#message
+RewriteRule ^message$ controller/message.php [L]
+RewriteRule ^message/my-chat/([^/]+)/([^/]+)/([^/]+)$ controller/message.php?command=my-chat&sender_id=$1&receiver_id=$2&is_all=$3 [L]
+RewriteRule ^message/all-chat/([^/]+)/([^/]+)$ controller/message.php?command=all-chat&id=$1&search=$2 [L]
