@@ -134,23 +134,42 @@
 
 			try {
 				$query = $writeDB->prepare("
-					SELECT
-						a.*,
-						b.address
-					FROM
-						cf_jobs a
-					INNER JOIN
-						cf_registration b 
-					ON 
-						a.createdBy = b.id 
-					WHERE 
-						b.id = :id 
-					AND 
-						a.jobTitle LIKE '%".$jsonData->jobTitle."%'
-					ORDER BY 
-						a.dateCreated DESC;
+					SELECT a.* FROM (
+						SELECT
+							a.*,
+							b.address,
+							'POSTED' AS jobStatus
+						FROM
+							cf_jobs a
+						INNER JOIN
+							cf_registration b 
+						ON 
+							a.createdBy = b.id 
+						WHERE 
+							b.id = :id  
+						AND 
+							a.jobTitle LIKE '%".$jsonData->jobTitle."%'
+							
+						UNION ALL 
+
+						SELECT
+							a.*,
+							b.address,
+							'APPLIED' AS jobStatus
+						FROM
+							cf_jobs a
+						INNER JOIN
+							cf_registration b 
+						ON 
+							a.createdBy = b.id 
+						WHERE 
+							a.id IN (SELECT jobID FROM cf_applied_job WHERE applicantID = :id2) 
+						AND 
+							a.jobTitle LIKE '%".$jsonData->jobTitle."%'
+					) a 
 				");
 				$query->bindParam(':id',$jsonData->createdBy,PDO::PARAM_INT);
+				$query->bindParam(':id2',$jsonData->createdBy,PDO::PARAM_INT);
 				$query->execute();
 				$jobs = array();
 
@@ -171,6 +190,7 @@
 					$temp["dateCreated"]  = $row["dateCreated"];
 					$temp["f_dateCreated"]  = "Posted ".formatTimeAgo($row["dateCreated"]);
 					$temp["address"]  =  $row["address"];
+					$temp["jobStatus"]  =  $row["jobStatus"];
 					$jobs[] = $temp;
 				}
 
@@ -184,7 +204,7 @@
 				sendResponse(500,false,"There was an error getting jobs. Please try again ");
 			}
 		} else if ($command === "APPLY_JOB") {
-			if (!isset($jsonData->id) || !isset($jsonData->applicantId)) {
+			if (!isset($jsonData->id) || !isset($jsonData->applicantId) || !isset($jsonData->fileLink)) {
 				sendResponse(400,false,"The JSON body you sent has incomplete parameters");
 			}
 
@@ -192,12 +212,13 @@
 			try {
 				$query = $writeDB->prepare("
 					INSERT INTO cf_applied_job 
-						(jobID,applicantID) 
+						(jobID,applicantID,resumeLink) 
 					VALUES 
-						(:jobID,:applicantID) 
+						(:jobID,:applicantID,:resumeLink) 
 				");
 				$query->bindParam(':jobID',$jsonData->id,PDO::PARAM_INT);
 				$query->bindParam(':applicantID',$jsonData->applicantId,PDO::PARAM_INT);
+				$query->bindParam(':resumeLink',$jsonData->fileLink,PDO::PARAM_STR);
 				$query->execute();
 
 				$rowCount = $query->rowCount();
