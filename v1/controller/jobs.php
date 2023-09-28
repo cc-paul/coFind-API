@@ -127,6 +127,34 @@
 				error_log("Database query error: ".$ex,0);
 				sendResponse(500,false,"There was an error creating jobs. Please try again ");
 			}
+		} else if ($command === "CHANGE_STATUS") {
+			if (
+				!isset($jsonData->id) || 
+				!isset($jsonData->status)
+			) {
+				sendResponse(400,false,"The JSON body you sent has incomplete parameters");
+			}
+
+
+			try {
+				$query = $writeDB->prepare("
+					UPDATE cf_applied_job SET `status` = :status WHERE id=:id
+				");
+				$query->bindParam(':status',$jsonData->status,PDO::PARAM_STR);
+				$query->bindParam(':id',$jsonData->id,PDO::PARAM_INT);
+				$query->execute();
+
+				$rowCount = $query->rowCount();
+
+				if ($rowCount === 0) {
+					sendResponse(500,false,"There was an issue updating your job.Please try again");
+				}
+
+				sendResponse(201,true,"Job has been updated completely");
+			} catch (PDOException $ex) {
+				error_log("Database query error: ".$ex,0);
+				sendResponse(500,false,"There was an error creating jobs. Please try again ");
+			}
 		} else if ($command === "SEARCH_POST") {
 			if (!isset($jsonData->jobTitle) || !isset($jsonData->createdBy)) {
 				sendResponse(400,false,"The JSON body you sent has incomplete parameters");
@@ -138,7 +166,8 @@
 						SELECT
 							a.*,
 							b.address,
-							'POSTED' AS jobStatus
+							'POSTED' AS jobStatus,
+							(SELECT COUNT(*) FROM cf_applied_job WHERE jobID = a.id) AS countApplied
 						FROM
 							cf_jobs a
 						INNER JOIN
@@ -155,7 +184,8 @@
 						SELECT
 							a.*,
 							b.address,
-							'APPLIED' AS jobStatus
+							'APPLIED' AS jobStatus,
+							0 AS countApplied
 						FROM
 							cf_jobs a
 						INNER JOIN
@@ -191,6 +221,7 @@
 					$temp["f_dateCreated"]  = "Posted ".formatTimeAgo($row["dateCreated"]);
 					$temp["address"]  =  $row["address"];
 					$temp["jobStatus"]  =  $row["jobStatus"];
+					$temp["countApplied"] = $row["countApplied"];
 					$jobs[] = $temp;
 				}
 
@@ -212,13 +243,14 @@
 			try {
 				$query = $writeDB->prepare("
 					INSERT INTO cf_applied_job 
-						(jobID,applicantID,resumeLink) 
+						(jobID,applicantID,resumeLink,dateCreated) 
 					VALUES 
-						(:jobID,:applicantID,:resumeLink) 
+						(:jobID,:applicantID,:resumeLink,:dateCreated) 
 				");
 				$query->bindParam(':jobID',$jsonData->id,PDO::PARAM_INT);
 				$query->bindParam(':applicantID',$jsonData->applicantId,PDO::PARAM_INT);
 				$query->bindParam(':resumeLink',$jsonData->fileLink,PDO::PARAM_STR);
+				$query->bindParam(':dateCreated',$global_date,PDO::PARAM_STR);
 				$query->execute();
 
 				$rowCount = $query->rowCount();
@@ -381,6 +413,62 @@
 				error_log("Database query error: ".$ex,0);
 				sendResponse(500,false,"There was an error deleting jobs. Please try again ");
 			}
+		} else if ($_GET['command'] === 'view-applicants') { 
+			$id = $_GET["id"];
+
+			$search = str_replace("-","",$_GET["search"]);
+			$search = str_replace("'","",$search);
+
+
+			$query = $writeDB->prepare("
+				SELECT a.* FROM (
+					SELECT 
+						a.id,
+						a.jobID,
+						a.applicantID,
+						func_proper(CONCAT(b.lastName,', ',b.firstName,' ',IFNULL(b.middleName,''))) AS fullName,
+						a.resumeLink,
+						IFNULL(b.imageLink,'') AS imageLink,
+						a.dateCreated,
+						a.status
+					FROM
+						cf_applied_job a 
+					INNER JOIN
+						cf_registration b 
+					ON 
+						a.applicantID = b.id 
+					WHERE 
+						b.lastName LIKE '%".$search."%' 
+					OR 
+						b.firstName LIKE '%".$search."%'
+					OR 
+						b.middleName LIKE '%".$search."%'
+					ORDER BY
+						func_proper(CONCAT(b.lastName,', ',b.firstName,' ',IFNULL(b.middleName,''))) ASC
+				) a WHERE a.jobID = ".$id."
+			");
+
+			$query->execute();
+			$jobs = array();
+
+			while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
+				$temp = array();
+				$temp["id"]  = $row["id"];
+				$temp["jobID"]  = $row["jobID"];
+				$temp["applicantID"] = $row["applicantID"];
+				$temp["fullName"] = $row["fullName"];
+				$temp["resumeLink"] = $row["resumeLink"];
+				$temp["imageLink"] = $row["imageLink"];
+				$temp["dateCreated"]  = "Applied ".formatTimeAgo($row["dateCreated"]);
+				$temp["status"] = $row["status"];
+				$jobs[] = $temp;
+			}
+
+			$returnData = array();
+			$returnData["rows_returned"] = count($jobs);
+			$returnData["applicants"] = $jobs;
+
+			sendResponse(201,true,"Applicant has been retreived",$returnData);
 		}
 	} else if ($method === 'DELETE') {
 		
