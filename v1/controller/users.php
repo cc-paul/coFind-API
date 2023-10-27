@@ -380,7 +380,7 @@
 			$user_id = $_GET["user_id"];
 
 			try {
-				$query = $writeDB->prepare("SELECT * FROM cf_registration WHERE id = :id");
+				$query = $writeDB->prepare("SELECT a.*,(SELECT FORMAT(IFNULL(AVG(1.0 * starsCount),0),0) FROM cf_review WHERE reviewedID = a.id) AS countStars  FROM cf_registration a WHERE a.id = :id");
 				$query->bindParam(':id',$user_id,PDO::PARAM_INT);
 				$query->execute();
 				$returnData = array();
@@ -394,12 +394,13 @@
 					$returnData["address"]      = $row["address"];
 					$returnData["username"]     = $row["username"];
 					$returnData["imageLink"]    = $row["imageLink"] == "" ? "-" : $row["imageLink"];
+					$returnData["countStars"]   = $row["countStars"];
 				}
 
 				sendResponse(201,true,"Account has been retreived",$returnData);
 			} catch (PDOException $ex) {
 				error_log("Database query error: ".$ex,0);
-				sendResponse(500,false,"There was an error creating account. Please try again");
+				sendResponse(500,false,"There was an error retreiving account. Please try again");
 			}
 		} else {
 			sendResponse(400,false,"Endpoint not found");

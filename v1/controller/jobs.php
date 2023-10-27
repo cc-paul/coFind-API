@@ -147,7 +147,7 @@
 				$rowCount = $query->rowCount();
 
 				if ($rowCount === 0) {
-					sendResponse(500,false,"There was an issue updating your job.Please try again");
+					sendResponse(500,false,"There was an issue creating jobs. Please try again");
 				}
 
 				sendResponse(201,true,"Job has been updated completely");
@@ -167,7 +167,11 @@
 							a.*,
 							b.address,
 							'POSTED' AS jobStatus,
-							(SELECT COUNT(*) FROM cf_applied_job WHERE jobID = a.id) AS countApplied
+							(SELECT COUNT(*) FROM cf_applied_job WHERE jobID = a.id) AS countApplied,
+							0 AS completionID,
+							0 AS applicantID,
+							'' AS recruitersName,
+							'' AS applicantsName
 						FROM
 							cf_jobs a
 						INNER JOIN
@@ -185,7 +189,11 @@
 							a.*,
 							b.address,
 							'APPLIED' AS jobStatus,
-							0 AS countApplied
+							0 AS countApplied,
+							0 AS completionID,
+							0 AS applicantID,
+							'' AS recruitersName,
+							'' AS applicantsName
 						FROM
 							cf_jobs a
 						INNER JOIN
@@ -196,10 +204,74 @@
 							a.id IN (SELECT jobID FROM cf_applied_job WHERE applicantID = :id2) 
 						AND 
 							a.jobTitle LIKE '%".$jsonData->jobTitle."%'
+
+						UNION ALL 
+
+						SELECT
+							a.*,
+							b.address,
+							'ACTIVE' AS jobStatus,
+							1 AS countApplied,
+							c.id AS completionID,
+							0 AS applicantID,
+							'' AS recruitersName,
+							'' AS applicantsName
+						FROM
+							cf_jobs a
+						INNER JOIN
+							cf_registration b 
+						ON 
+							a.createdBy = b.id 
+						INNER JOIN
+							cf_applied_job c 
+						ON 
+							c.jobID = a.id 
+						WHERE
+							c.`status` = 'Accepted' 
+						AND 
+							(a.createdBy = :id3 OR c.applicantID = :id4)
+						AND 
+							a.jobTitle LIKE '%".$jsonData->jobTitle."%'
+
+						UNION ALL 
+
+						SELECT
+							a.*,
+							b.address,
+							'COMPLETED' AS jobStatus,
+							1 AS countApplied,
+							c.id AS completionID,
+							c.applicantID AS applicantID,
+							proper(CONCAT(b.lastName,', ',b.firstName,' ',IFNULL(b.middleName,''))) AS recruitersName,
+							proper(CONCAT(d.lastName,', ',d.firstName,' ',IFNULL(d.middleName,''))) AS applicantsName
+						FROM
+							cf_jobs a
+						INNER JOIN
+							cf_registration b 
+						ON 
+							a.createdBy = b.id 
+						INNER JOIN
+							cf_applied_job c 
+						ON 
+							c.jobID = a.id 
+						INNER JOIN 
+							cf_registration d 
+						ON 
+							c.applicantID = d.id
+						WHERE
+							c.`status` = 'Completed' 
+						AND 
+							(a.createdBy = :id5 OR c.applicantID = :id6)
+						AND 
+							a.jobTitle LIKE '%".$jsonData->jobTitle."%'
 					) a 
 				");
 				$query->bindParam(':id',$jsonData->createdBy,PDO::PARAM_INT);
 				$query->bindParam(':id2',$jsonData->createdBy,PDO::PARAM_INT);
+				$query->bindParam(':id3',$jsonData->createdBy,PDO::PARAM_INT);
+				$query->bindParam(':id4',$jsonData->createdBy,PDO::PARAM_INT);
+				$query->bindParam(':id5',$jsonData->createdBy,PDO::PARAM_INT);
+				$query->bindParam(':id6',$jsonData->createdBy,PDO::PARAM_INT);
 				$query->execute();
 				$jobs = array();
 
@@ -222,6 +294,10 @@
 					$temp["address"]  =  $row["address"];
 					$temp["jobStatus"]  =  $row["jobStatus"];
 					$temp["countApplied"] = $row["countApplied"];
+					$temp["completionID"] = $row["completionID"];
+					$temp["applicantID"] = $row["applicantID"];
+					$temp["recruitersName"] = $row["recruitersName"];
+					$temp["applicantsName"] = $row["applicantsName"];
 					$jobs[] = $temp;
 				}
 
@@ -263,6 +339,79 @@
 			} catch (PDOException $ex) {
 				error_log("Database query error: ".$ex,0);
 				sendResponse(500,false,"There was an error applying jobs. Please try again ");
+			}
+		} else if ($command === "ADD_REVIEW") {
+			if (
+				!isset($jsonData->id) || 
+				!isset($jsonData->jobID) || 
+				!isset($jsonData->reviewerID) || 
+				!isset($jsonData->reviewedID) || 
+				!isset($jsonData->review) || 
+				!isset($jsonData->starsCount)
+			) {
+				sendResponse(400,false,"The JSON body you sent has incomplete parameters");
+			}
+
+			try {
+				$query = $writeDB->prepare("
+					INSERT INTO cf_review 
+						(id,jobID,reviewerID,reviewedID,review,starsCount) 
+					VALUES 
+						(:id,:jobID,:reviewerID,:reviewedID,:review,:starsCount) 
+				");
+				$query->bindParam(':id',$jsonData->id,PDO::PARAM_INT);
+				$query->bindParam(':jobID',$jsonData->jobID,PDO::PARAM_INT);
+				$query->bindParam(':reviewerID',$jsonData->reviewerID,PDO::PARAM_INT);
+				$query->bindParam(':reviewedID',$jsonData->reviewedID,PDO::PARAM_STR);
+				$query->bindParam(':review',$jsonData->review,PDO::PARAM_STR);
+				$query->bindParam(':starsCount',$jsonData->starsCount,PDO::PARAM_INT);
+				$query->execute();
+
+				$rowCount = $query->rowCount();
+
+				if ($rowCount === 0) {
+					sendResponse(500,false,"There was an issue adding review.Please try again");
+				}
+
+				sendResponse(201,true,"Review has been completed");
+			} catch (PDOException $ex) {
+				error_log("Database query error: ".$ex,0);
+				sendResponse(500,false,"There was an error adding review. Please try again ");
+			}
+		} else if ($command === "EDIT_REVIEW") {
+			if (
+				!isset($jsonData->id) || 
+				!isset($jsonData->jobID) || 
+				!isset($jsonData->reviewerID) || 
+				!isset($jsonData->reviewedID) || 
+				!isset($jsonData->review) || 
+				!isset($jsonData->starsCount)
+			) {
+				sendResponse(400,false,"The JSON body you sent has incomplete parameters");
+			}
+
+			try {
+				$query = $writeDB->prepare("
+					UPDATE cf_review SET 
+						review=:review,starsCount=:starsCount
+					WHERE
+						id=:id
+				");
+				$query->bindParam(':review',$jsonData->review,PDO::PARAM_STR);
+				$query->bindParam(':starsCount',$jsonData->starsCount,PDO::PARAM_INT);
+				$query->bindParam(':id',$jsonData->id,PDO::PARAM_INT);
+				$query->execute();
+
+				$rowCount = $query->rowCount();
+
+				if ($rowCount === 0) {
+					sendResponse(500,false,"There was an issue adding review.Please try again");
+				}
+
+				sendResponse(201,true,"Review has been completed");
+			} catch (PDOException $ex) {
+				error_log("Database query error: ".$ex,0);
+				sendResponse(500,false,"There was an error adding review. Please try again ");
 			}
 		} else {
 			sendResponse(404,false,"Command not found");
@@ -341,7 +490,8 @@
 						b.id AS createdBy,
 						proper(CONCAT(b.lastName,', ',b.firstName,' ',IFNULL(b.middleName,''))) AS fullName,
 						IFNULL(b.imageLink,'-') AS imageLink,
-						IF(IFNULL(c.applicantId,0) = ".$id.",0,1) AS enableApplyButton
+						IF(IFNULL(c.applicantId,0) = ".$id.",0,1) AS enableApplyButton,
+						(SELECT FORMAT(IFNULL(AVG(1.0 * starsCount),0),0) FROM cf_review WHERE reviewedID = a.createdBy) AS countStars 
 					FROM
 						cf_jobs a 
 					INNER JOIN
@@ -377,6 +527,7 @@
 					$temp["fullName"]  =  $row["fullName"];
 					$temp["imageLink"] = $row["imageLink"];
 					$temp["enableApplyButton"] = $row["enableApplyButton"];
+					$temp["countStars"] = $row["countStars"];
 					$jobs[] = $temp;
 				}
 
@@ -469,6 +620,69 @@
 			$returnData["applicants"] = $jobs;
 
 			sendResponse(201,true,"Applicant has been retreived",$returnData);
+		} else if ($_GET['command'] === 'review') { 
+			$jobID      = $_GET["jobID"];
+			$reviewerID = $_GET["reviewerID"];
+			$reviewedID = $_GET["reviewedID"];
+
+			$query = $writeDB->prepare("
+				SELECT id,review,starsCount FROM cf_review WHERE jobID=".$jobID." AND reviewerID=".$reviewerID." AND reviewedID=".$reviewedID."
+			");
+
+			$query->execute();
+			$review = array();
+
+			while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
+				$temp = array();
+				$temp["id"]  = $row["id"];
+				$temp["review"]  = $row["review"];
+				$temp["starsCount"] = $row["starsCount"];
+				$review[] = $temp;
+			}
+
+			$returnData = array();
+			$returnData["rows_returned"] = count($review);
+			$returnData["review"] = $review;
+
+			sendResponse(201,true,"Review has been retreived",$returnData);
+		} else if ($_GET['command'] === 'view-review') { 
+			$reviewedID = $_GET["reviewedID"];
+
+			$query = $writeDB->prepare("
+				SELECT 
+					func_proper(CONCAT(b.lastName,', ',b.firstName,' ',IFNULL(b.middleName,''))) AS fullName,
+					a.review,
+					a.starsCount,
+					IFNULL(b.imageLink,'-') AS imageLink
+				FROM
+					cf_review a 
+				INNER JOIN
+					cf_registration b 
+				ON 
+					a.reviewerID = b.id 
+				WHERE
+					a.reviewedID = ".$reviewedID."
+				ORDER BY
+					a.id DESC
+			");
+
+			$query->execute();
+			$review = array();
+
+			while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
+				$temp = array();
+				$temp["fullName"]  = $row["fullName"];
+				$temp["review"]  = $row["review"];
+				$temp["starsCount"] = $row["starsCount"];
+				$temp["imageLink"] = $row["imageLink"];
+				$review[] = $temp;
+			}
+
+			$returnData = array();
+			$returnData["rows_returned"] = count($review);
+			$returnData["review"] = $review;
+
+			sendResponse(201,true,"Review has been retreived",$returnData);
 		}
 	} else if ($method === 'DELETE') {
 		

@@ -27,6 +27,8 @@ RewriteRule ^jobs/job/([^/]+)?$ controller/jobs.php?command=job&id=$1 [L]
 RewriteRule ^jobs/job/delete/([^/]+)?$ controller/jobs.php?command=delete_job&id=$1 [L]
 RewriteRule ^jobs/job-all/([^/]+)?$ controller/jobs.php?command=job-all&id=$1 [L]
 RewriteRule ^jobs/view-applicants/([^/]+)/([^/]+)$ controller/jobs.php?command=view-applicants&id=$1&search=$2 [L]
+RewriteRule ^jobs/review/([^/]+)/([^/]+)/([^/]+)$ controller/jobs.php?command=review&jobID=$1&reviewerID=$2&reviewedID=$3 [L]
+RewriteRule ^jobs/view-review/([^/]+)$ controller/jobs.php?command=view-review&reviewedID=$1 [L]
 
 
 #message
